@@ -13,7 +13,15 @@ const Sidebar = () => {
   return (
     <aside className="glass" style={{ width: '280px', margin: '1rem', display: 'flex', flexDirection: 'column', padding: '2rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '3rem' }}>
-        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ 
+          width: '40px', 
+          height: '40px', 
+          borderRadius: '10px', 
+          background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center' 
+        }}>
           <Code color="white" size={24} />
         </div>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Stitch</h2>

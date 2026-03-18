@@ -8,9 +8,21 @@ import { LayoutDashboard, TrendingUp, Users, DollarSign } from 'lucide-react';
 
 const App = () => {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: radial-gradient(circle at 50% 50%, #1a1c2e 0%, #0c0e14 100%), overflow: 'hidden' }}>
+    <div style={{ 
+      display: 'flex', 
+      minHeight: '100vh', 
+      background: 'radial-gradient(circle at 50% 50%, #1a1c2e 0%, #0c0e14 100%)', 
+      overflow: 'hidden' 
+    }}>
       <Sidebar />
-      <main style={{ flex: 1, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem', overflowY: 'auto' }}>
+      <main style={{ 
+        flex: 1, 
+        padding: '2rem', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '2rem', 
+        overflowY: 'auto' 
+      }}>
         <Header />
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
