@@ -3,6 +3,8 @@ const CATEGORIES = [
     id: "fx",
     title: "환율",
     exportName: "환율",
+    preferredItemName: "USD",
+    chartLabel: "환율(USD)",
     icon: "💱",
     sub: "731Y001 · 매매기준율 (일별)",
     statCode: "731Y001",
@@ -42,6 +44,8 @@ const CATEGORIES = [
     id: "rate",
     title: "국고채·회사채·단기금리",
     exportName: "금리",
+    preferredItemName: "국고채(3년)",
+    chartLabel: "금리(국고채(3년))",
     icon: "📈",
     sub: "817Y002 · 시장금리 (일별)",
     statCode: "817Y002",
@@ -66,6 +70,8 @@ const CATEGORIES = [
     id: "base",
     title: "한국은행 기준금리",
     exportName: "기준금리",
+    preferredItemName: "기준금리",
+    chartLabel: "기준금리",
     icon: "🏦",
     sub: "722Y001 · 기준금리 및 여수신금리 (일별)",
     statCode: "722Y001",
@@ -76,6 +82,8 @@ const CATEGORIES = [
     id: "loan",
     title: "예금은행 대출금리",
     exportName: "예대금리",
+    preferredItemName: "대출평균",
+    chartLabel: "예대금리",
     icon: "💳",
     sub: "121Y006 · 신규취급액 기준 (월별)",
     statCode: "121Y006",
@@ -86,6 +94,8 @@ const CATEGORIES = [
     id: "cpi",
     title: "소비자물가지수",
     exportName: "소비자물가",
+    preferredItemName: "총지수",
+    chartLabel: "소비자물가",
     icon: "📊",
     sub: "901Y009 · 총지수, 2020=100 (월별)",
     statCode: "901Y009",
@@ -96,6 +106,8 @@ const CATEGORIES = [
     id: "ppi",
     title: "생산자물가지수",
     exportName: "생산자물가",
+    preferredItemName: "총지수",
+    chartLabel: "생산자물가",
     icon: "🏭",
     sub: "404Y014 · 총지수, 2020=100 (월별)",
     statCode: "404Y014",
@@ -393,6 +405,9 @@ async function queryCategory(cat) {
 
   tbody.innerHTML = `<tr><td colspan="${columnCount}" class="empty-msg"><span class="spinner"></span>조회중...</td></tr>`;
   const range = getQueryRange(cat.cycle);
+  cat._lastRows = [];
+  cat._lastItems = items;
+  cat._lastRange = range;
 
   let allRows = [];
   const errors = [];
@@ -449,22 +464,27 @@ async function queryCategory(cat) {
   }
 }
 
+function getExportItems(cat) {
+  return cat._lastItems || getDisplayItems(getCheckedItems(cat));
+}
+
 function buildRowsForExport(cat) {
   const rows = cat._lastRows || [];
-  const header = ["일자", "항목명", "값"];
-  const body = rows.map((r) => [r.time, r.item_name, numFmt(r.value)]);
-
-  const byItem = {};
-  rows.forEach((r) => {
-    const v = parseFloat(r.value);
-    if (Number.isNaN(v)) return;
-    if (!byItem[r.item_name]) byItem[r.item_name] = { sum: 0, cnt: 0 };
-    byItem[r.item_name].sum += v;
-    byItem[r.item_name].cnt += 1;
+  const items = getExportItems(cat);
+  const valuesByDate = new Map();
+  rows.forEach((row) => {
+    if (!valuesByDate.has(row.time)) valuesByDate.set(row.time, new Map());
+    valuesByDate.get(row.time).set(row.item_name, row.value);
   });
-  const avgRows = Object.entries(byItem).map(([name, s]) => [`${name} 평균`, "", (s.sum / s.cnt).toFixed(2)]);
-
-  return { header, body, avgRows };
+  const dates = [...valuesByDate.keys()].sort();
+  if (items.length === 1) {
+    const item = items[0];
+    return { header: ["항목", ...dates], body: [[item.name, ...dates.map((date) => valuesByDate.get(date).get(item.name) ?? "-")]] };
+  }
+  return {
+    header: ["일자", ...items.map((item) => item.name)],
+    body: dates.map((date) => [date, ...items.map((item) => valuesByDate.get(date).get(item.name) ?? "-")]),
+  };
 }
 
 function copyCategory(cat) {
@@ -472,16 +492,32 @@ function copyCategory(cat) {
     showToast("먼저 조회를 실행하세요.");
     return;
   }
-  const { header, body, avgRows } = buildRowsForExport(cat);
-  const lines = [header.join("\t"), ...body.map((r) => r.join("\t"))];
-  if (avgRows.length) {
-    lines.push("");
-    avgRows.forEach((r) => lines.push(r.join("\t")));
-  }
+  const { header, body } = buildRowsForExport(cat);
+  const lines = [header.join("\t"), ...body.map((row) => row.map((value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? numFmt(parsed) : value;
+  }).join("\t"))];
   navigator.clipboard.writeText(lines.join("\n")).then(
     () => showToast(`${cat.title} 결과가 클립보드에 복사되었습니다. 엑셀에 붙여넣으세요.`),
     () => showToast("복사에 실패했습니다.")
   );
+}
+
+function workbookSheetForCategory(cat) {
+  const items = getExportItems(cat);
+  const preferredItemName = items.some((item) => item.name === cat.preferredItemName)
+    ? cat.preferredItemName
+    : items[0]?.name;
+  const chartLabel = preferredItemName === cat.preferredItemName
+    ? cat.chartLabel
+    : `${cat.exportName}(${preferredItemName})`;
+  return {
+    sheetName: cat.exportName || cat.title,
+    items,
+    rows: cat._lastRows || [],
+    preferredItemName,
+    chartLabel,
+  };
 }
 
 function exportCategoryExcel(cat) {
@@ -489,33 +525,43 @@ function exportCategoryExcel(cat) {
     showToast("먼저 조회를 실행하세요.");
     return;
   }
-  const { header, body, avgRows } = buildRowsForExport(cat);
-
-  const sheetName = cat.exportName || cat.title;
-  let html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${sheetName}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1">`;
-  html += "<tr>" + header.map((h) => `<th>${h}</th>`).join("") + "</tr>";
-  body.forEach((r) => {
-    html += "<tr>" + r.map((c) => `<td>${c ?? ""}</td>`).join("") + "</tr>";
-  });
-  if (avgRows.length) {
-    html += "<tr><td></td></tr>";
-    avgRows.forEach((r) => {
-      html += "<tr>" + r.map((c) => `<td><b>${c ?? ""}</b></td>`).join("") + "</tr>";
-    });
+  if (!window.EcosXlsx) {
+    showToast("엑셀 생성 모듈을 불러오지 못했습니다.");
+    return;
   }
-  html += "</table></body></html>";
-
-  const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const sheetName = cat.exportName || cat.title;
   const range = cat._lastRange || getQueryRange(cat.cycle);
-  const filename = `${sheetName}_${range.start}_${range.end}.xls`;
-
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const filename = `${sheetName}_${range.start}_${range.end}.xlsx`;
+  window.EcosXlsx.downloadWorkbook({ sheets: [workbookSheetForCategory(cat)], filename });
   showToast(`${filename} 다운로드되었습니다.`);
+}
+
+async function exportAllExcel() {
+  const button = document.getElementById("btnExportAll");
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "조회 및 생성중...";
+  try {
+    for (const cat of CATEGORIES) await queryCategory(cat);
+    const missing = CATEGORIES.filter((cat) => !cat._lastRows || cat._lastRows.length === 0);
+    if (missing.length) {
+      showToast(`${missing.map((cat) => cat.exportName).join(", ")} 데이터가 없어 통합 파일을 만들 수 없습니다.`);
+      return;
+    }
+    const range = getQueryRange("D");
+    const filename = `ECOS통계_${range.start}_${range.end}.xlsx`;
+    window.EcosXlsx.downloadWorkbook({
+      sheets: CATEGORIES.map(workbookSheetForCategory),
+      combinedChartSheetName: "기준금리",
+      filename,
+    });
+    showToast(`${filename} 다운로드되었습니다.`);
+  } catch (error) {
+    showToast(`전체 엑셀 생성 실패: ${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
 }
 
 document.getElementById("btnQueryAll").addEventListener("click", async () => {
@@ -524,3 +570,5 @@ document.getElementById("btnQueryAll").addEventListener("click", async () => {
   }
   showToast("전체 조회가 완료되었습니다.");
 });
+
+document.getElementById("btnExportAll").addEventListener("click", exportAllExcel);
