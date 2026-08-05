@@ -218,6 +218,10 @@ function renderPivotTable(thead, tbody, items, rows) {
         return `<td>${values.has(item.name) ? numFmt(values.get(item.name)) : "-"}</td>`;
       })
       .join("")}</tr>`;
+    requestAnimationFrame(() => {
+      const tableWrap = tbody.closest(".table-wrap");
+      if (tableWrap) tableWrap.scrollLeft = tableWrap.scrollWidth;
+    });
     return;
   }
 
