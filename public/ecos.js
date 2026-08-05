@@ -556,7 +556,6 @@ async function exportAllExcel() {
     const filename = `ECOS통계_${range.start}_${range.end}.xlsx`;
     window.EcosXlsx.downloadWorkbook({
       sheets: CATEGORIES.map(workbookSheetForCategory),
-      combinedChartSheetName: "기준금리",
       filename,
     });
     showToast(`${filename} 다운로드되었습니다.`);

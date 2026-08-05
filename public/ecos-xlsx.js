@@ -114,25 +114,55 @@
 
   function modelSeriesDefinitions(sheetName, model) {
     const categories = rangeFormula(sheetName, model.categories);
+    const pointCount = model.categories.row
+      ? Math.max(model.categories.endColumn - model.categories.startColumn + 1, 1)
+      : Math.max(model.categories.endRow - model.categories.startRow + 1, 1);
     return model.series.map((series) => ({
       label: series.itemName,
       categories,
       values: seriesFormula(sheetName, series),
+      pointCount,
+      axis: "primary",
     }));
   }
 
-  function chartXml(seriesDefinitions) {
-    const seriesXml = seriesDefinitions.map((series, index) => {
-      const color = chartColors[index % chartColors.length];
-      return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:v>${escapeXml(series.label)}</c:v></c:tx><c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:ln></c:spPr><c:marker><c:symbol val="none"/></c:marker><c:cat><c:strRef><c:f>${escapeXml(series.categories)}</c:f></c:strRef></c:cat><c:val><c:numRef><c:f>${escapeXml(series.values)}</c:f></c:numRef></c:val><c:smooth val="0"/></c:ser>`;
-    }).join("");
-
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:date1904 val="0"/><c:lang val="ko-KR"/><c:roundedCorners val="0"/><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/><c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesXml}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/></c:dLbls><c:axId val="48650112"/><c:axId val="48672768"/></c:lineChart><c:catAx><c:axId val="48650112"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:tickLblPos val="nextTo"/><c:crossAx val="48672768"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx><c:valAx><c:axId val="48672768"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines/><c:numFmt formatCode="#,##0.00" sourceLinked="0"/><c:tickLblPos val="nextTo"/><c:crossAx val="48650112"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea><c:legend><c:legendPos val="b"/><c:layout/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart><c:printSettings><c:headerFooter/><c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/></c:printSettings></c:chartSpace>`;
+  function lineSeriesXml(series, index) {
+    const color = chartColors[index % chartColors.length];
+    return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:v>${escapeXml(series.label)}</c:v></c:tx><c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:ln></c:spPr><c:marker><c:symbol val="none"/></c:marker><c:cat><c:strRef><c:f>${escapeXml(series.categories)}</c:f></c:strRef></c:cat><c:val><c:numRef><c:f>${escapeXml(series.values)}</c:f></c:numRef></c:val><c:smooth val="0"/></c:ser>`;
   }
 
-  function drawingXml(startRow) {
+  function lineChartGroup(series, categoryAxisId, valueAxisId) {
+    const seriesXml = series.map((entry) => lineSeriesXml(entry.series, entry.index)).join("");
+    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesXml}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/></c:dLbls><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:lineChart>`;
+  }
+
+  function valueAxisXml(axisId, position, categoryAxisId, secondary = false) {
+    const gridlines = secondary ? "" : "<c:majorGridlines/>";
+    const crosses = secondary ? '<c:crosses val="max"/>' : '<c:crosses val="autoZero"/>';
+    return `<c:valAx><c:axId val="${axisId}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${position}"/>${gridlines}<c:numFmt formatCode="#,##0.00" sourceLinked="0"/><c:majorTickMark val="out"/><c:tickLblPos val="nextTo"/><c:crossAx val="${categoryAxisId}"/>${crosses}<c:crossBetween val="between"/></c:valAx>`;
+  }
+
+  function chartXml(seriesDefinitions) {
+    const categoryAxisId = 48650112;
+    const primaryAxisId = 48672768;
+    const secondaryAxisId = 48695552;
+    const indexed = seriesDefinitions.map((series, index) => ({ series, index }));
+    const primary = indexed.filter((entry) => entry.series.axis !== "secondary");
+    const secondary = indexed.filter((entry) => entry.series.axis === "secondary");
+    const mainSeries = primary.length ? primary : secondary;
+    const secondarySeries = primary.length ? secondary : [];
+    const labelSkip = Math.max(1, Math.ceil(Math.max(...seriesDefinitions.map((series) => series.pointCount || 1)) / 12));
+    const lineCharts = lineChartGroup(mainSeries, categoryAxisId, primaryAxisId)
+      + (secondarySeries.length ? lineChartGroup(secondarySeries, categoryAxisId, secondaryAxisId) : "");
+    const secondaryAxis = secondarySeries.length ? valueAxisXml(secondaryAxisId, "r", categoryAxisId, true) : "";
+
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:date1904 val="0"/><c:lang val="ko-KR"/><c:roundedCorners val="0"/><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/>${lineCharts}<c:catAx><c:axId val="${categoryAxisId}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:tickLblPos val="nextTo"/><c:tickLblSkip val="${labelSkip}"/><c:tickMarkSkip val="${labelSkip}"/><c:crossAx val="${primaryAxisId}"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="1"/></c:catAx>${valueAxisXml(primaryAxisId, "l", categoryAxisId)}${secondaryAxis}</c:plotArea><c:legend><c:legendPos val="b"/><c:layout/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart><c:printSettings><c:headerFooter/><c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/></c:printSettings></c:chartSpace>`;
+  }
+
+  function drawingXml(startRow, startColumn = 0) {
     const fromRow = Math.max(startRow - 1, 0);
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${fromRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>8</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${fromRow + 18}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="ECOS 데이터 차트"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+    const fromColumn = Math.max(startColumn, 0);
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>${fromColumn}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${fromRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${fromColumn + 10}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${fromRow + 18}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="ECOS 데이터 차트"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
   }
 
   function stylesXml() {
@@ -207,21 +237,78 @@
     return candidate;
   }
 
-  function buildWorkbookBytes({ sheets, combinedChartSheetName }) {
+  function median(values) {
+    if (!values.length) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+
+  function exchangeSeriesWithAxes(sheet) {
+    const series = modelSeriesDefinitions(sheet.name, sheet.model);
+    const medians = new Map();
+    sheet.items.forEach((item) => {
+      const values = sheet.rows
+        .filter((row) => row.item_name === item.name)
+        .map((row) => numericValue(row.value))
+        .filter((value) => value !== null);
+      medians.set(item.name, median(values));
+    });
+    const positive = series.map((entry) => medians.get(entry.label)).filter((value) => value > 0);
+    if (positive.length < 2) return series;
+    const minimum = Math.min(...positive);
+    const maximum = Math.max(...positive);
+    if (maximum / minimum < 2) return series;
+    const threshold = Math.sqrt(minimum * maximum);
+    return series.map((entry) => ({
+      ...entry,
+      axis: medians.get(entry.label) < threshold ? "secondary" : "primary",
+    }));
+  }
+
+  function relabelSeries(series, label) {
+    return { ...series, label };
+  }
+
+  function chartPlanForSheet(sheet, prepared) {
+    if (sheet.name === "환율") {
+      return { series: exchangeSeriesWithAxes(sheet), startRow: 1, startColumn: 26 };
+    }
+
+    if (sheet.name === "기준금리") {
+      const market = prepared.find((entry) => entry.name === "금리");
+      const loan = prepared.find((entry) => entry.name === "예대금리");
+      if (market && loan) {
+        const marketSeries = modelSeriesDefinitions(market.name, market.model);
+        const baseSeries = modelSeriesDefinitions(sheet.name, sheet.model).map((entry) => relabelSeries(entry, "기준금리"));
+        const loanSeries = modelSeriesDefinitions(loan.name, loan.model).map((entry) => relabelSeries(entry, "예대금리"));
+        return { series: [...marketSeries, ...baseSeries, ...loanSeries], startRow: 10, startColumn: 0 };
+      }
+    }
+
+    if (sheet.name === "소비자물가") {
+      const producer = prepared.find((entry) => entry.name === "생산자물가");
+      if (producer) {
+        const consumerSeries = modelSeriesDefinitions(sheet.name, sheet.model).map((entry) => relabelSeries(entry, "소비자물가"));
+        const producerSeries = modelSeriesDefinitions(producer.name, producer.model).map((entry) => relabelSeries(entry, "생산자물가"));
+        return { series: [...consumerSeries, ...producerSeries], startRow: 10, startColumn: 0 };
+      }
+    }
+
+    return {
+      series: modelSeriesDefinitions(sheet.name, sheet.model),
+      startRow: Math.max(sheet.model.matrix.length + 3, 10),
+      startColumn: 0,
+    };
+  }
+
+  function buildWorkbookBytes({ sheets }) {
     const usedNames = new Set();
     const prepared = sheets.map((sheet) => ({
       ...sheet,
       name: safeSheetName(sheet.sheetName, usedNames),
       model: buildWorkbookModel(sheet.items, sheet.rows),
     }));
-    const combinedSheetIndex = combinedChartSheetName
-      ? prepared.findIndex((sheet) => sheet.name === combinedChartSheetName)
-      : -1;
-    const combinedSeries = prepared.map((sheet) => {
-      const available = modelSeriesDefinitions(sheet.name, sheet.model);
-      const selected = available.find((series) => series.label === sheet.preferredItemName) || available[0];
-      return { ...selected, label: sheet.chartLabel || `${sheet.name}(${selected.label})` };
-    });
     const now = new Date().toISOString();
 
     const contentOverrides = prepared.map((sheet, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/drawings/drawing${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/><Override PartName="/xl/charts/chart${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`).join("");
@@ -240,19 +327,18 @@
 
     prepared.forEach((sheet, index) => {
       const partNumber = index + 1;
-      const chartStartRow = index === combinedSheetIndex ? 10 : Math.max(sheet.model.matrix.length + 3, 10);
-      const series = index === combinedSheetIndex ? combinedSeries : modelSeriesDefinitions(sheet.name, sheet.model);
+      const chartPlan = chartPlanForSheet(sheet, prepared);
       files[`xl/worksheets/sheet${partNumber}.xml`] = worksheetXml(sheet.model);
       files[`xl/worksheets/_rels/sheet${partNumber}.xml.rels`] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${partNumber}.xml"/></Relationships>`;
-      files[`xl/drawings/drawing${partNumber}.xml`] = drawingXml(chartStartRow);
+      files[`xl/drawings/drawing${partNumber}.xml`] = drawingXml(chartPlan.startRow, chartPlan.startColumn);
       files[`xl/drawings/_rels/drawing${partNumber}.xml.rels`] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${partNumber}.xml"/></Relationships>`;
-      files[`xl/charts/chart${partNumber}.xml`] = chartXml(series);
+      files[`xl/charts/chart${partNumber}.xml`] = chartXml(chartPlan.series);
     });
     return zipStore(files);
   }
 
-  function downloadWorkbook({ sheets, combinedChartSheetName, filename }) {
-    const bytes = buildWorkbookBytes({ sheets, combinedChartSheetName });
+  function downloadWorkbook({ sheets, filename }) {
+    const bytes = buildWorkbookBytes({ sheets });
     const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
