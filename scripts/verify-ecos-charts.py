@@ -73,6 +73,41 @@ class EcosChartLayoutTest(unittest.TestCase):
         self.assertTrue(all(any(sheet in formula for sheet in ("'소비자물가'", "'생산자물가'")) for formula in self.formulas(chart)))
         self.assertGreater(self.label_skip(chart), 1)
 
+    def test_chart_titles_axes_gridlines_and_legends_are_readable(self):
+        expected_titles = {
+            1: "환율 추이",
+            3: "금리 비교",
+            5: "물가지수 비교",
+        }
+        drawing = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        for number, expected_title in expected_titles.items():
+            with self.subTest(chart=number):
+                chart = self.chart(number)
+                title = chart.find(f".//{C}chart/{C}title")
+                self.assertIsNotNone(title)
+                self.assertIn(expected_title, "".join(title.itertext()))
+
+                gridlines = chart.findall(f".//{C}majorGridlines")
+                self.assertGreaterEqual(len(gridlines), 2)
+                for gridline in gridlines:
+                    color = gridline.find(f".//{drawing}srgbClr")
+                    dash = gridline.find(f".//{drawing}prstDash")
+                    self.assertIsNotNone(color)
+                    self.assertEqual(color.attrib.get("val"), "D9E2EC")
+                    self.assertIsNotNone(dash)
+                    self.assertEqual(dash.attrib.get("val"), "dash")
+
+                axes = chart.findall(f".//{C}catAx") + chart.findall(f".//{C}valAx")
+                for axis in axes:
+                    dash = axis.find(f"./{C}spPr/{drawing}ln/{drawing}prstDash")
+                    self.assertIsNotNone(dash)
+                    self.assertEqual(dash.attrib.get("val"), "solid")
+
+                legend = chart.find(f".//{C}legend")
+                legend_bold = legend.find(f".//{drawing}defRPr") if legend is not None else None
+                self.assertIsNotNone(legend_bold)
+                self.assertEqual(legend_bold.attrib.get("b"), "1")
+                self.assertIn("일자", "".join(chart.itertext()))
 
 if __name__ == "__main__":
     unittest.main()

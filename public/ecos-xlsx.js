@@ -128,7 +128,7 @@
 
   function lineSeriesXml(series, index) {
     const color = chartColors[index % chartColors.length];
-    return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:v>${escapeXml(series.label)}</c:v></c:tx><c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:ln></c:spPr><c:marker><c:symbol val="none"/></c:marker><c:cat><c:strRef><c:f>${escapeXml(series.categories)}</c:f></c:strRef></c:cat><c:val><c:numRef><c:f>${escapeXml(series.values)}</c:f></c:numRef></c:val><c:smooth val="0"/></c:ser>`;
+    return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/><c:tx><c:v>${escapeXml(series.label)}</c:v></c:tx><c:spPr><a:ln w="28575"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:ln></c:spPr><c:marker><c:symbol val="none"/></c:marker><c:cat><c:strRef><c:f>${escapeXml(series.categories)}</c:f></c:strRef></c:cat><c:val><c:numRef><c:f>${escapeXml(series.values)}</c:f></c:numRef></c:val><c:smooth val="0"/></c:ser>`;
   }
 
   function lineChartGroup(series, categoryAxisId, valueAxisId) {
@@ -136,13 +136,34 @@
     return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesXml}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/></c:dLbls><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:lineChart>`;
   }
 
-  function valueAxisXml(axisId, position, categoryAxisId, secondary = false) {
-    const gridlines = secondary ? "" : "<c:majorGridlines/>";
-    const crosses = secondary ? '<c:crosses val="max"/>' : '<c:crosses val="autoZero"/>';
-    return `<c:valAx><c:axId val="${axisId}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${position}"/>${gridlines}<c:numFmt formatCode="#,##0.00" sourceLinked="0"/><c:majorTickMark val="out"/><c:tickLblPos val="nextTo"/><c:crossAx val="${categoryAxisId}"/>${crosses}<c:crossBetween val="between"/></c:valAx>`;
+  function richTitleXml(text, fontSize = 1100, bold = false) {
+    if (!text) return "";
+    return `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="ko-KR" sz="${fontSize}" b="${bold ? 1 : 0}"/><a:t>${escapeXml(text)}</a:t></a:r><a:endParaRPr lang="ko-KR" sz="${fontSize}"/></a:p></c:rich></c:tx><c:layout/><c:overlay val="0"/></c:title>`;
   }
 
-  function chartXml(seriesDefinitions) {
+  function gridlinesXml() {
+    return '<c:majorGridlines><c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="D9E2EC"><a:alpha val="55000"/></a:srgbClr></a:solidFill><a:prstDash val="dash"/></a:ln></c:spPr></c:majorGridlines>';
+  }
+
+  function axisStyleXml() {
+    return '<c:spPr><a:ln w="12700"><a:solidFill><a:srgbClr val="7A8793"/></a:solidFill><a:prstDash val="solid"/></a:ln></c:spPr>';
+  }
+
+  function axisTextPropertiesXml() {
+    return '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr lang="ko-KR" sz="900"><a:solidFill><a:srgbClr val="52606D"/></a:solidFill></a:defRPr></a:pPr><a:endParaRPr lang="ko-KR" sz="900"/></a:p></c:txPr>';
+  }
+
+  function legendTextPropertiesXml() {
+    return '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr lang="ko-KR" sz="1000" b="1"><a:solidFill><a:srgbClr val="25313C"/></a:solidFill></a:defRPr></a:pPr><a:endParaRPr lang="ko-KR" sz="1000" b="1"/></a:p></c:txPr>';
+  }
+
+  function valueAxisXml(axisId, position, categoryAxisId, secondary = false, title = "값") {
+    const gridlines = secondary ? "" : gridlinesXml();
+    const crosses = secondary ? '<c:crosses val="max"/>' : '<c:crosses val="autoZero"/>';
+    return `<c:valAx><c:axId val="${axisId}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${position}"/>${gridlines}${richTitleXml(title, 1000, true)}<c:numFmt formatCode="#,##0.00" sourceLinked="0"/><c:majorTickMark val="out"/><c:tickLblPos val="nextTo"/>${axisStyleXml()}${axisTextPropertiesXml()}<c:crossAx val="${categoryAxisId}"/>${crosses}<c:crossBetween val="between"/></c:valAx>`;
+  }
+
+  function chartXml(seriesDefinitions, options = {}) {
     const categoryAxisId = 48650112;
     const primaryAxisId = 48672768;
     const secondaryAxisId = 48695552;
@@ -154,9 +175,13 @@
     const labelSkip = Math.max(1, Math.ceil(Math.max(...seriesDefinitions.map((series) => series.pointCount || 1)) / 12));
     const lineCharts = lineChartGroup(mainSeries, categoryAxisId, primaryAxisId)
       + (secondarySeries.length ? lineChartGroup(secondarySeries, categoryAxisId, secondaryAxisId) : "");
-    const secondaryAxis = secondarySeries.length ? valueAxisXml(secondaryAxisId, "r", categoryAxisId, true) : "";
+    const secondaryAxis = secondarySeries.length
+      ? valueAxisXml(secondaryAxisId, "r", categoryAxisId, true, options.secondaryYTitle || "보조축")
+      : "";
+    const chartTitle = richTitleXml(options.chartTitle || "ECOS 통계 추이", 1500, true);
+    const categoryAxis = `<c:catAx><c:axId val="${categoryAxisId}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/>${gridlinesXml()}${richTitleXml(options.xTitle || "일자", 1000, true)}<c:majorTickMark val="out"/><c:tickLblPos val="nextTo"/>${axisStyleXml()}${axisTextPropertiesXml()}<c:crossAx val="${primaryAxisId}"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:tickLblSkip val="${labelSkip}"/><c:tickMarkSkip val="${labelSkip}"/><c:noMultiLvlLbl val="1"/></c:catAx>`;
 
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:date1904 val="0"/><c:lang val="ko-KR"/><c:roundedCorners val="0"/><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/>${lineCharts}<c:catAx><c:axId val="${categoryAxisId}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorTickMark val="out"/><c:tickLblPos val="nextTo"/><c:tickLblSkip val="${labelSkip}"/><c:tickMarkSkip val="${labelSkip}"/><c:crossAx val="${primaryAxisId}"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="1"/></c:catAx>${valueAxisXml(primaryAxisId, "l", categoryAxisId)}${secondaryAxis}</c:plotArea><c:legend><c:legendPos val="b"/><c:layout/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart><c:printSettings><c:headerFooter/><c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/></c:printSettings></c:chartSpace>`;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:date1904 val="0"/><c:lang val="ko-KR"/><c:roundedCorners val="0"/><c:chart>${chartTitle}<c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>${lineCharts}${categoryAxis}${valueAxisXml(primaryAxisId, "l", categoryAxisId, false, options.primaryYTitle || "값")}${secondaryAxis}<c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr></c:plotArea><c:legend><c:legendPos val="b"/><c:layout/>${legendTextPropertiesXml()}</c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/><c:showDLblsOverMax val="0"/></c:chart><c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:solidFill><a:srgbClr val="E6EBF0"/></a:solidFill></a:ln></c:spPr><c:printSettings><c:headerFooter/><c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/></c:printSettings></c:chartSpace>`;
   }
 
   function drawingXml(startRow, startColumn = 0) {
@@ -272,7 +297,7 @@
 
   function chartPlanForSheet(sheet, prepared) {
     if (sheet.name === "환율") {
-      return { series: exchangeSeriesWithAxes(sheet), startRow: 1, startColumn: 26 };
+      return { series: exchangeSeriesWithAxes(sheet), startRow: 1, startColumn: 26, chartTitle: "환율 추이", xTitle: "일자", primaryYTitle: "환율(주축)", secondaryYTitle: "환율(보조축)" };
     }
 
     if (sheet.name === "기준금리") {
@@ -282,7 +307,7 @@
         const marketSeries = modelSeriesDefinitions(market.name, market.model);
         const baseSeries = modelSeriesDefinitions(sheet.name, sheet.model).map((entry) => relabelSeries(entry, "기준금리"));
         const loanSeries = modelSeriesDefinitions(loan.name, loan.model).map((entry) => relabelSeries(entry, "예대금리"));
-        return { series: [...marketSeries, ...baseSeries, ...loanSeries], startRow: 10, startColumn: 0 };
+        return { series: [...marketSeries, ...baseSeries, ...loanSeries], startRow: 10, startColumn: 0, chartTitle: "금리 비교 (시장금리·기준금리·예대금리)", xTitle: "일자", primaryYTitle: "금리(%)" };
       }
     }
 
@@ -291,14 +316,19 @@
       if (producer) {
         const consumerSeries = modelSeriesDefinitions(sheet.name, sheet.model).map((entry) => relabelSeries(entry, "소비자물가"));
         const producerSeries = modelSeriesDefinitions(producer.name, producer.model).map((entry) => relabelSeries(entry, "생산자물가"));
-        return { series: [...consumerSeries, ...producerSeries], startRow: 10, startColumn: 0 };
+        return { series: [...consumerSeries, ...producerSeries], startRow: 10, startColumn: 0, chartTitle: "물가지수 비교 (소비자·생산자)", xTitle: "일자", primaryYTitle: "지수" };
       }
     }
 
+    const isRate = ["금리", "기준금리", "예대금리"].includes(sheet.name);
+    const isPrice = ["소비자물가", "생산자물가"].includes(sheet.name);
     return {
       series: modelSeriesDefinitions(sheet.name, sheet.model),
       startRow: Math.max(sheet.model.matrix.length + 3, 10),
       startColumn: 0,
+      chartTitle: `${sheet.name} 추이`,
+      xTitle: "일자",
+      primaryYTitle: isRate ? "금리(%)" : isPrice ? "지수" : "값",
     };
   }
 
@@ -332,7 +362,7 @@
       files[`xl/worksheets/_rels/sheet${partNumber}.xml.rels`] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${partNumber}.xml"/></Relationships>`;
       files[`xl/drawings/drawing${partNumber}.xml`] = drawingXml(chartPlan.startRow, chartPlan.startColumn);
       files[`xl/drawings/_rels/drawing${partNumber}.xml.rels`] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${partNumber}.xml"/></Relationships>`;
-      files[`xl/charts/chart${partNumber}.xml`] = chartXml(chartPlan.series);
+      files[`xl/charts/chart${partNumber}.xml`] = chartXml(chartPlan.series, chartPlan);
     });
     return zipStore(files);
   }
