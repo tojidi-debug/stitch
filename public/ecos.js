@@ -175,10 +175,36 @@ function showToast(msg) {
   showToast._t = setTimeout(() => toastEl.classList.remove("show"), 1800);
 }
 
+function getDisplayItems(items) {
+  return [...items].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function tableHeaderHtml(items) {
+  return `<th class="date-column">일자</th>${items.map((item) => `<th>${item.name}</th>`).join("")}`;
+}
+
+function renderPivotTable(tbody, items, rows) {
+  const valuesByDate = new Map();
+  rows.forEach((row) => {
+    if (!valuesByDate.has(row.time)) valuesByDate.set(row.time, new Map());
+    valuesByDate.get(row.time).set(row.item_name, row.value);
+  });
+
+  tbody.innerHTML = [...valuesByDate.keys()]
+    .sort()
+    .map((time) => {
+      const values = valuesByDate.get(time);
+      const cells = items.map((item) => `<td>${values.has(item.name) ? numFmt(values.get(item.name)) : "-"}</td>`).join("");
+      return `<tr><td>${time}</td>${cells}</tr>`;
+    })
+    .join("");
+}
+
 function buildCard(cat) {
   const card = document.createElement("div");
   card.className = "card";
   card.id = `card-${cat.id}`;
+  const initialItems = getDisplayItems(cat.items.filter((item) => item.checked || cat.items.length === 1));
 
   const itemsHtml = cat.items
     .map(
@@ -214,8 +240,8 @@ function buildCard(cat) {
     <div class="chart-box" id="chart-${cat.id}"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th style="width:90px;">일자</th><th>항목명</th><th style="width:90px;">값</th></tr></thead>
-        <tbody id="tbody-${cat.id}"><tr><td colspan="3" class="empty-msg">조회 버튼을 눌러 데이터를 가져오세요.</td></tr></tbody>
+        <thead><tr id="thead-${cat.id}">${tableHeaderHtml(initialItems)}</tr></thead>
+        <tbody id="tbody-${cat.id}"><tr><td colspan="${initialItems.length + 1}" class="empty-msg">조회 버튼을 눌러 데이터를 가져오세요.</td></tr></tbody>
       </table>
     </div>
   `;
@@ -319,8 +345,11 @@ function buildChartSVG(seriesMap, range) {
 }
 
 async function queryCategory(cat) {
-  const items = getCheckedItems(cat);
+  const items = getDisplayItems(getCheckedItems(cat));
   const tbody = document.getElementById(`tbody-${cat.id}`);
+  const thead = document.getElementById(`thead-${cat.id}`);
+  const columnCount = Math.max(items.length + 1, 1);
+  thead.innerHTML = tableHeaderHtml(items);
   const summary = document.getElementById(`summary-${cat.id}`);
   const chartBox = document.getElementById(`chart-${cat.id}`);
   summary.style.display = "none";
@@ -329,21 +358,21 @@ async function queryCategory(cat) {
   chartBox.innerHTML = "";
 
   if (items.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="3" class="empty-msg">조회할 항목을 1개 이상 선택하세요.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${columnCount}" class="empty-msg">조회할 항목을 1개 이상 선택하세요.</td></tr>`;
     return;
   }
 
   const mode = document.querySelector('input[name="dateMode"]:checked').value;
   if (mode === "single" && !document.getElementById("dateSingle").value) {
-    tbody.innerHTML = `<tr><td colspan="3" class="empty-msg">조회일을 입력하세요.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${columnCount}" class="empty-msg">조회일을 입력하세요.</td></tr>`;
     return;
   }
   if (mode === "range" && (!document.getElementById("dateStart").value || !document.getElementById("dateEnd").value)) {
-    tbody.innerHTML = `<tr><td colspan="3" class="empty-msg">시작일과 종료일을 입력하세요.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${columnCount}" class="empty-msg">시작일과 종료일을 입력하세요.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = `<tr><td colspan="3" class="empty-msg"><span class="spinner"></span>조회중...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="${columnCount}" class="empty-msg"><span class="spinner"></span>조회중...</td></tr>`;
   const range = getQueryRange(cat.cycle);
 
   let allRows = [];
@@ -367,13 +396,11 @@ async function queryCategory(cat) {
   cat._lastRange = range;
 
   if (allRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="3" class="error-msg">${errors.length ? errors.join("<br/>") : "해당 기간에 데이터가 없습니다."}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${columnCount}" class="error-msg">${errors.length ? errors.join("<br/>") : "해당 기간에 데이터가 없습니다."}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = allRows
-    .map((r) => `<tr><td>${r.time}</td><td>${r.item_name}</td><td>${numFmt(r.value)}</td></tr>`)
-    .join("");
+  renderPivotTable(tbody, items, allRows);
 
   const byItem = {};
   allRows.forEach((r) => {

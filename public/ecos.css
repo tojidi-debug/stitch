@@ -34,7 +34,7 @@ header {
 }
 
 .header-inner {
-  width: 1300px;
+  width: min(1300px, 100%);
   margin: 0 auto;
   padding: 12px 20px;
   font-size: var(--fs-title);
@@ -51,7 +51,7 @@ header .logo {
 }
 
 main {
-  width: 1300px;
+  width: min(1300px, 100%);
   margin: 0 auto;
   padding: 18px 20px 50px;
 }
@@ -258,13 +258,14 @@ main {
 
 .table-wrap {
   max-height: 240px;
-  overflow-y: auto;
+  overflow: auto;
   border: 1px solid var(--line);
   border-radius: 6px;
 }
 
 table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-xs);
 }
@@ -280,8 +281,14 @@ thead th {
   border-bottom: 1px solid var(--line);
 }
 
-thead th:last-child,
-tbody td:last-child {
+thead th,
+tbody td {
+  white-space: nowrap;
+}
+
+thead th:not(:first-child),
+tbody td:not(:first-child) {
+  min-width: 88px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
