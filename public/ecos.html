@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ECOS 통계 조회</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./ecos.css" />
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <span class="logo">ECOS</span><span>통계 조회</span>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="controls-row main-controls-row">
+      <span class="controls-label">📅 조회 기준 설정</span>
+
+      <div class="mode-toggle">
+        <label><input type="radio" name="dateMode" value="single" checked /> 단일 조회일</label>
+        <label><input type="radio" name="dateMode" value="range" /> 기간 조회</label>
+      </div>
+
+      <div class="date-fields" id="singleDateField">
+        <span>조회일</span>
+        <input type="text" inputmode="numeric" maxlength="10" placeholder="20260804" id="dateSingle" />
+      </div>
+
+      <div class="date-fields" id="rangeDateField" style="display:none;">
+        <span>시작일</span>
+        <input type="text" inputmode="numeric" maxlength="10" placeholder="20260728" id="dateStart" />
+        <span>종료일</span>
+        <input type="text" inputmode="numeric" maxlength="10" placeholder="20260804" id="dateEnd" />
+      </div>
+
+      <button class="btn btn-primary" id="btnQueryAll">전체 조회</button>
+      <button class="btn btn-clear" id="btnClearDates">Clear</button>
+    </div>
+  </section>
+
+  <div class="grid" id="cardGrid"></div>
+
+  <p class="footer-note">2020년 이후 데이터를 제공합니다. 월별 통계(예금은행 대출금리)는 발표 시차가 있어 최근 1~2개월 데이터가 아직 없을 수 있습니다. 날짜는 20260804 형식으로 입력하면 자동으로 구분됩니다.</p>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="./ecos.js"></script>
+<script>
+  document.addEventListener('contextmenu', function (event) {
+    event.preventDefault();
+  });
+</script>
+</body>
+</html>
