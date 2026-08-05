@@ -2,6 +2,7 @@ const CATEGORIES = [
   {
     id: "fx",
     title: "환율",
+    exportName: "환율",
     icon: "💱",
     sub: "731Y001 · 매매기준율 (일별)",
     statCode: "731Y001",
@@ -40,6 +41,7 @@ const CATEGORIES = [
   {
     id: "rate",
     title: "국고채·회사채·단기금리",
+    exportName: "금리",
     icon: "📈",
     sub: "817Y002 · 시장금리 (일별)",
     statCode: "817Y002",
@@ -63,6 +65,7 @@ const CATEGORIES = [
   {
     id: "base",
     title: "한국은행 기준금리",
+    exportName: "기준금리",
     icon: "🏦",
     sub: "722Y001 · 기준금리 및 여수신금리 (일별)",
     statCode: "722Y001",
@@ -72,6 +75,7 @@ const CATEGORIES = [
   {
     id: "loan",
     title: "예금은행 대출금리",
+    exportName: "예대금리",
     icon: "💳",
     sub: "121Y006 · 신규취급액 기준 (월별)",
     statCode: "121Y006",
@@ -81,6 +85,7 @@ const CATEGORIES = [
   {
     id: "cpi",
     title: "소비자물가지수",
+    exportName: "소비자물가",
     icon: "📊",
     sub: "901Y009 · 총지수, 2020=100 (월별)",
     statCode: "901Y009",
@@ -90,6 +95,7 @@ const CATEGORIES = [
   {
     id: "ppi",
     title: "생산자물가지수",
+    exportName: "생산자물가",
     icon: "🏭",
     sub: "404Y014 · 총지수, 2020=100 (월별)",
     statCode: "404Y014",
@@ -183,15 +189,28 @@ function tableHeaderHtml(items) {
   return `<th class="date-column">일자</th>${items.map((item) => `<th>${item.name}</th>`).join("")}`;
 }
 
-function renderPivotTable(tbody, items, rows) {
+function renderPivotTable(thead, tbody, items, rows) {
   const valuesByDate = new Map();
   rows.forEach((row) => {
     if (!valuesByDate.has(row.time)) valuesByDate.set(row.time, new Map());
     valuesByDate.get(row.time).set(row.item_name, row.value);
   });
 
-  tbody.innerHTML = [...valuesByDate.keys()]
-    .sort()
+  const dates = [...valuesByDate.keys()].sort();
+  if (items.length === 1) {
+    const item = items[0];
+    thead.innerHTML = `<th class="item-column">항목</th>${dates.map((time) => `<th>${time}</th>`).join("")}`;
+    tbody.innerHTML = `<tr><td>${item.name}</td>${dates
+      .map((time) => {
+        const values = valuesByDate.get(time);
+        return `<td>${values.has(item.name) ? numFmt(values.get(item.name)) : "-"}</td>`;
+      })
+      .join("")}</tr>`;
+    return;
+  }
+
+  thead.innerHTML = tableHeaderHtml(items);
+  tbody.innerHTML = dates
     .map((time) => {
       const values = valuesByDate.get(time);
       const cells = items.map((item) => `<td>${values.has(item.name) ? numFmt(values.get(item.name)) : "-"}</td>`).join("");
@@ -400,7 +419,7 @@ async function queryCategory(cat) {
     return;
   }
 
-  renderPivotTable(tbody, items, allRows);
+  renderPivotTable(thead, tbody, items, allRows);
 
   const byItem = {};
   allRows.forEach((r) => {
@@ -472,7 +491,8 @@ function exportCategoryExcel(cat) {
   }
   const { header, body, avgRows } = buildRowsForExport(cat);
 
-  let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body><table border="1">';
+  const sheetName = cat.exportName || cat.title;
+  let html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${sheetName}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1">`;
   html += "<tr>" + header.map((h) => `<th>${h}</th>`).join("") + "</tr>";
   body.forEach((r) => {
     html += "<tr>" + r.map((c) => `<td>${c ?? ""}</td>`).join("") + "</tr>";
@@ -487,7 +507,7 @@ function exportCategoryExcel(cat) {
 
   const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const range = cat._lastRange || getQueryRange(cat.cycle);
-  const filename = `${cat.title}_${range.start}_${range.end}.xls`;
+  const filename = `${sheetName}_${range.start}_${range.end}.xls`;
 
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
