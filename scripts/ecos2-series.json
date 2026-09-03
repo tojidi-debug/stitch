@@ -1,0 +1,67 @@
+[
+  {
+    "id": "stock",
+    "title": "주가지수",
+    "icon": "📈",
+    "description": "802Y001 · 주식시장 (일별)",
+    "statCode": "802Y001",
+    "cycle": "D",
+    "defaultVisible": true,
+    "items": [
+      {"id":"kospi","label":"KOSPI","codes":["0001000"],"default":true},
+      {"id":"kosdaq","label":"KOSDAQ","codes":["0089000"],"default":true}
+    ]
+  },
+  {
+    "id": "growth",
+    "title": "경제성장률",
+    "icon": "🌱",
+    "description": "902Y015 · 한국 경제성장률 (분기)",
+    "statCode": "902Y015",
+    "cycle": "Q",
+    "defaultVisible": true,
+    "items": [
+      {"id":"korea","label":"한국","codes":["KOR"],"default":true}
+    ]
+  },
+  {
+    "id": "trade",
+    "title": "수출·수입물가지수",
+    "icon": "🚢",
+    "description": "수출입물가 · 원화기준 (월별)",
+    "cycle": "M",
+    "defaultVisible": true,
+    "items": [
+      {"id":"export","label":"수출물가","statCode":"402Y014","codes":["*AA","W"],"default":true},
+      {"id":"import","label":"수입물가","statCode":"401Y015","codes":["*AA","W"],"default":true}
+    ]
+  },
+  {
+    "id": "living",
+    "title": "생활물가지수",
+    "icon": "🧺",
+    "description": "901Y010 · 소비자물가 특수분류 (월별)",
+    "statCode": "901Y010",
+    "cycle": "M",
+    "defaultVisible": true,
+    "items": [
+      {"id":"living","label":"생활물가","codes":["110"],"default":true},
+      {"id":"fresh","label":"신선식품","codes":["10"],"default":false}
+    ]
+  },
+  {
+    "id": "supply",
+    "title": "국내공급물가지수",
+    "icon": "🏭",
+    "description": "405Y006 · 국내공급물가지수 (월별)",
+    "statCode": "405Y006",
+    "cycle": "M",
+    "defaultVisible": true,
+    "items": [
+      {"id":"total","label":"총지수","codes":["*A"],"default":true},
+      {"id":"raw","label":"원재료","codes":["100A"],"default":true},
+      {"id":"intermediate","label":"중간재","codes":["200A"],"default":true},
+      {"id":"final","label":"최종재","codes":["300A"],"default":true}
+    ]
+  }
+]
