@@ -60,10 +60,10 @@ assert.deepEqual(tableMatrixForCategory("base", [transposedSeries[0]]), {
 });
 
 assert.deepEqual(tableMatrixForCategory("supply", transposedSeries), {
-  header: ["일자", "수출물가", "수입물가"],
+  header: ["항목", "202608", "202607"],
   body: [
-    ["202608", "121.2", "131.4"],
-    ["202607", "120.1", "130.3"],
+    ["수출물가", "121.2", "120.1"],
+    ["수입물가", "131.4", "130.3"],
   ],
 });
 

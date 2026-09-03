@@ -79,7 +79,7 @@ export function pivotSeries(series, options = {}) {
 }
 
 export function tableMatrixForCategory(categoryId, series) {
-  if (["stock", "trade"].includes(categoryId)) {
+  if (["stock", "trade", "supply"].includes(categoryId)) {
     const { dates, rows } = pivotSeries(series.map((item) => ({ label: item.name, rows: item.rows })), { descending: true });
     return { header: ["항목", ...dates], body: rows };
   }
