@@ -1,11 +1,80 @@
-import { cycleBoundary, filterRowsByRange, normalizeAdminSettings } from "./ecos2-core.js";
-
-const STORAGE_KEY = "ecos2.admin.v1";
+const STORAGE_KEY = "ecos2.admin.v2";
+const QUERY_SETTINGS_KEY = "ecos.querySettings.v1";
 const COLORS = ["#1a6de0", "#e0631a", "#1a9e6a", "#8b5cf6", "#e11d48", "#0ea5e9"];
-const grid = document.getElementById("cardGrid");
-const toast = document.getElementById("toast");
-let catalog = [];
+export const CATALOG = [
+  {"id":"stock","title":"주가지수","exportName":"주가지수","icon":"📈","sub":"802Y001 · 주식시장 (일별)","cycle":"D","dataRoot":"./ecos-data","defaultVisible":true,"items":[{"id":"kospi","code":"0001000","name":"KOSPI","file":"stock-kospi.json","checked":true},{"id":"kosdaq","code":"0089000","name":"KOSDAQ","file":"stock-kosdaq.json","checked":true}]},
+  {"id":"base","title":"한국은행 기준금리","exportName":"기준금리","icon":"🏦","sub":"722Y001 · 기준금리 (일별)","cycle":"D","dataRoot":"./ecos-data","defaultVisible":true,"items":[{"id":"base","code":"0101000","name":"기준금리","file":"base-0101000.json","checked":true}]},
+  {"id":"growth","title":"경제성장률","exportName":"경제성장률","icon":"🌱","sub":"902Y015 · 한국 경제성장률 (분기)","cycle":"Q","dataRoot":"./ecos-data","defaultVisible":true,"items":[{"id":"korea","code":"KOR","name":"한국","file":"growth-korea.json","checked":true}]},
+  {"id":"trade","title":"수출·수입물가지수","exportName":"수출입물가","icon":"🚢","sub":"원화기준, 2020=100 (월별)","cycle":"M","dataRoot":"./ecos-data","defaultVisible":true,"items":[{"id":"export","code":"*AA/W","name":"수출물가","file":"trade-export.json","checked":true},{"id":"import","code":"*AA/W","name":"수입물가","file":"trade-import.json","checked":true}]},
+  {"id":"living","title":"생활물가지수","exportName":"생활물가","icon":"🧺","sub":"901Y010 · 소비자물가 특수분류 (월별)","cycle":"M","dataRoot":"./ecos-data","defaultVisible":true,"items":[{"id":"living","code":"110","name":"생활물가","file":"living-living.json","checked":true},{"id":"fresh","code":"10","name":"신선식품","file":"living-fresh.json","checked":false}]},
+  {"id":"supply","title":"국내공급물가지수","exportName":"국내공급물가","icon":"🏭","sub":"405Y006 · 2020=100 (월별)","cycle":"M","dataRoot":"./ecos-data","defaultVisible":true,"items":[{"id":"total","code":"*A","name":"총지수","file":"supply-total.json","checked":true},{"id":"raw","code":"100A","name":"원재료","file":"supply-raw.json","checked":true},{"id":"intermediate","code":"200A","name":"중간재","file":"supply-intermediate.json","checked":true},{"id":"final","code":"300A","name":"최종재","file":"supply-final.json","checked":true}]},
+  {"id":"fx","title":"환율","exportName":"환율","icon":"💱","sub":"731Y001 · 매매기준율 (일별)","cycle":"D","dataRoot":"./ecos-data","defaultVisible":false,"items":[{"id":"usd","code":"0000001","name":"USD","file":"fx-0000001.json","checked":true},{"id":"eur","code":"0000003","name":"EUR","file":"fx-0000003.json","checked":true},{"id":"jpy","code":"0000002","name":"JPY(100)","file":"fx-0000002.json","checked":true},{"id":"cny","code":"0000053","name":"CNY","file":"fx-0000053.json","checked":true}]},
+  {"id":"rate","title":"국고채·회사채·단기금리","exportName":"금리","icon":"📉","sub":"817Y002 · 시장금리 (일별)","cycle":"D","dataRoot":"./ecos-data","defaultVisible":false,"items":[{"id":"gov3","code":"010200000","name":"국고채(3년)","file":"rate-010200000.json","checked":true},{"id":"gov5","code":"010200001","name":"국고채(5년)","file":"rate-010200001.json","checked":true},{"id":"gov10","code":"010210000","name":"국고채(10년)","file":"rate-010210000.json","checked":true},{"id":"corp3","code":"010300000","name":"회사채(3년,AA-)","file":"rate-010300000.json","checked":true}]},
+  {"id":"loan","title":"예금은행 대출금리","exportName":"예대금리","icon":"💳","sub":"121Y006 · 신규취급액 기준 (월별)","cycle":"M","dataRoot":"./ecos-data","defaultVisible":false,"items":[{"id":"loan","code":"BECBLA01","name":"대출평균","file":"loan-BECBLA01.json","checked":true}]},
+  {"id":"cpi","title":"소비자물가지수","exportName":"소비자물가","icon":"📊","sub":"901Y009 · 총지수, 2020=100 (월별)","cycle":"M","dataRoot":"./ecos-data","defaultVisible":false,"items":[{"id":"cpi","code":"0","name":"총지수","file":"cpi-0.json","checked":true}]},
+  {"id":"ppi","title":"생산자물가지수","exportName":"생산자물가","icon":"🏗️","sub":"404Y014 · 총지수, 2020=100 (월별)","cycle":"M","dataRoot":"./ecos-data","defaultVisible":false,"items":[{"id":"ppi","code":"*AA","name":"총지수","file":"ppi-_42AA.json","checked":true}]}
+];
+const hasDocument = typeof document !== "undefined";
+const grid = hasDocument ? document.getElementById("cardGrid") : null;
+const toast = hasDocument ? document.getElementById("toast") : null;
+let catalog = CATALOG;
 let settings = { order: [], hidden: [], titles: {} };
+
+export function cycleBoundary(dateValue, cycle) {
+  const digits = String(dateValue || "").replace(/\D/g, "");
+  const year = digits.slice(0, 4);
+  if (cycle === "A") return year;
+  if (cycle === "Q") {
+    const month = Number(digits.slice(4, 6) || "1");
+    return `${year}Q${Math.min(4, Math.max(1, Math.ceil(month / 3)))}`;
+  }
+  if (cycle === "M") return digits.slice(0, 6);
+  return digits.slice(0, 8);
+}
+
+export function filterRowsByRange(rows, startDate, endDate, cycle) {
+  const start = cycleBoundary(startDate, cycle);
+  const end = cycleBoundary(endDate, cycle);
+  return (rows || []).filter(([time]) => String(time) >= start && String(time) <= end);
+}
+
+export function normalizeAdminSettings(sourceCatalog, candidate = {}) {
+  const ids = sourceCatalog.map((item) => item.id);
+  const allowed = new Set(ids);
+  const requestedOrder = Array.isArray(candidate.order) ? candidate.order.filter((id) => allowed.has(id)) : [];
+  const order = [...new Set([...requestedOrder, ...ids])];
+  const hidden = Array.isArray(candidate.hidden)
+    ? [...new Set(candidate.hidden.filter((id) => allowed.has(id)))]
+    : sourceCatalog.filter((item) => item.defaultVisible === false).map((item) => item.id);
+  const titles = {};
+  if (candidate.titles && typeof candidate.titles === "object") {
+    for (const [id, title] of Object.entries(candidate.titles)) {
+      if (allowed.has(id) && typeof title === "string" && title.trim()) titles[id] = title.trim().slice(0, 40);
+    }
+  }
+  return { order, hidden, titles };
+}
+
+export function pivotSeries(series, options = {}) {
+  const dates = [...new Set(series.flatMap((item) => (item.rows || []).map(([time]) => String(time))))].sort();
+  if (options.descending) dates.reverse();
+  const rows = series.map((item) => {
+    const values = new Map((item.rows || []).map(([time, value]) => [String(time), String(value)]));
+    return [item.label, ...dates.map((date) => values.get(date) ?? "")];
+  });
+  return { dates, rows };
+}
+
+export function tableMatrixForCategory(categoryId, series) {
+  if (["stock", "trade"].includes(categoryId)) {
+    const { dates, rows } = pivotSeries(series.map((item) => ({ label: item.name, rows: item.rows })), { descending: true });
+    return { header: ["항목", ...dates], body: rows };
+  }
+  const dates = [...new Set(series.flatMap((item) => item.rows.map(([time]) => time)))].sort();
+  const maps = series.map((item) => new Map(item.rows));
+  if (series.length === 1) return { header: ["항목", ...dates], body: [[series[0].name, ...dates.map((date) => maps[0].get(date) ?? "")]] };
+  return { header: ["일자", ...series.map((item) => item.name)], body: dates.map((date) => [date, ...maps.map((map) => map.get(date) ?? "")]) };
+}
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
@@ -27,12 +96,35 @@ function displayDate(value) {
   return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
 }
 
+function loadQuerySettings() {
+  try { return JSON.parse(localStorage.getItem(QUERY_SETTINGS_KEY) || "null"); }
+  catch { return null; }
+}
+
+function saveQuerySettings() {
+  localStorage.setItem(QUERY_SETTINGS_KEY, JSON.stringify({
+    mode: document.querySelector('input[name="dateMode"]:checked').value,
+    single: document.getElementById("dateSingle").value,
+    start: document.getElementById("dateStart").value,
+    end: document.getElementById("dateEnd").value,
+  }));
+}
+
+function syncDateMode(mode) {
+  const single = mode !== "range";
+  document.querySelector(`input[name="dateMode"][value="${single ? "single" : "range"}"]`).checked = true;
+  document.getElementById("singleDateField").hidden = !single;
+  document.getElementById("rangeDateField").hidden = single;
+}
+
 function initDates() {
   const today = new Date();
   const start = new Date(today.getFullYear() - 2, today.getMonth(), today.getDate());
-  document.getElementById("dateSingle").value = displayDate(compactDate(today));
-  document.getElementById("dateStart").value = displayDate(compactDate(start));
-  document.getElementById("dateEnd").value = displayDate(compactDate(today));
+  const saved = loadQuerySettings();
+  document.getElementById("dateSingle").value = saved?.single ?? displayDate(compactDate(today));
+  document.getElementById("dateStart").value = saved?.start ?? displayDate(compactDate(start));
+  document.getElementById("dateEnd").value = saved?.end ?? displayDate(compactDate(today));
+  syncDateMode(saved?.mode === "single" ? "single" : "range");
 }
 
 function attachDateMask(input) {
@@ -40,6 +132,7 @@ function attachDateMask(input) {
     const caretAtEnd = input.selectionStart === input.value.length;
     input.value = displayDate(input.value);
     if (caretAtEnd) input.setSelectionRange(input.value.length, input.value.length);
+    saveQuerySettings();
   });
 }
 
@@ -129,20 +222,16 @@ function formatNumber(value) {
   return number.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 3 });
 }
 
-function tableMatrix(series) {
-  const dates = [...new Set(series.flatMap((item) => item.rows.map(([time]) => time)))].sort();
-  const maps = series.map((item) => new Map(item.rows));
-  if (series.length === 1) return { header: ["항목", ...dates], body: [[series[0].name, ...dates.map((date) => maps[0].get(date) ?? "")]] };
-  return { header: ["일자", ...series.map((item) => item.name)], body: dates.map((date) => [date, ...maps.map((map) => map.get(date) ?? "")]) };
-}
-
-function renderTable(card, series) {
-  const { header, body } = tableMatrix(series);
+function renderTable(card, category, series) {
+  const { header, body } = tableMatrixForCategory(category.id, series);
   const thead = card.querySelector("thead");
   const tbody = card.querySelector("tbody");
   thead.innerHTML = `<tr>${header.map((cell) => `<th>${escapeHtml(cell)}</th>`).join("")}</tr>`;
   tbody.innerHTML = body.map((row) => `<tr>${row.map((cell, index) => `<td>${index === 0 ? escapeHtml(cell) : formatNumber(cell)}</td>`).join("")}</tr>`).join("");
-  requestAnimationFrame(() => { const wrap = card.querySelector("[data-role=table]"); wrap.scrollLeft = wrap.scrollWidth; });
+  requestAnimationFrame(() => {
+    const wrap = card.querySelector("[data-role=table]");
+    wrap.scrollLeft = ["stock", "trade"].includes(category.id) ? 0 : wrap.scrollWidth;
+  });
 }
 
 function renderSummary(card, series) {
@@ -199,7 +288,7 @@ async function queryCategory(category) {
     const chart = card.querySelector("[data-role=chart]");
     chart.innerHTML = chartSvg(available);
     chart.style.display = "block";
-    renderTable(card, available);
+    renderTable(card, category, available);
     return true;
   } catch (error) {
     renderError(card, location.protocol === "file:" ? "공개 웹 주소에서 열어 주세요. 로컬 파일은 데이터를 불러올 수 없습니다." : error.message);
@@ -217,7 +306,7 @@ function sheetFor(category) {
 
 function copyCategory(category) {
   if (!category._lastSeries?.length) return showToast("먼저 조회를 실행하세요.");
-  const matrix = tableMatrix(category._lastSeries);
+  const matrix = tableMatrixForCategory(category.id, category._lastSeries);
   const text = [matrix.header, ...matrix.body].map((row) => row.join("\t")).join("\n");
   navigator.clipboard.writeText(text).then(() => showToast(`${titleFor(category)} 결과를 복사했습니다.`), () => showToast("복사에 실패했습니다."));
 }
@@ -264,7 +353,7 @@ function renderAdmin() {
   const list = document.getElementById("adminList");
   list.innerHTML = settings.order.map((id) => {
     const category = map.get(id);
-    return `<div class="admin-row" data-admin-id="${escapeHtml(id)}"><label><input type="checkbox" data-admin-visible ${settings.hidden.includes(id) ? "" : "checked"} /> ${category.icon} 표시</label><input type="text" data-admin-title value="${escapeHtml(titleFor(category))}" aria-label="${escapeHtml(category.title)} 표시 이름"/><div class="admin-move"><button type="button" data-move="up" aria-label="위로 이동">↑</button><button type="button" data-move="down" aria-label="아래로 이동">↓</button></div></div>`;
+    return `<div class="admin-row" data-admin-id="${escapeHtml(id)}"><label><input type="checkbox" data-admin-visible ${settings.hidden.includes(id) ? "" : "checked"} /> ${category.icon} ${escapeHtml(category.title)}</label><input type="text" data-admin-title value="${escapeHtml(titleFor(category))}" aria-label="${escapeHtml(category.title)} 표시 이름"/><div class="admin-move"><button type="button" data-move="up" aria-label="위로 이동">↑</button><button type="button" data-move="down" aria-label="아래로 이동">↓</button></div></div>`;
   }).join("");
   list.querySelectorAll("[data-move]").forEach((button) => button.addEventListener("click", () => {
     const row = button.closest(".admin-row");
@@ -287,40 +376,29 @@ function applyAdminFromForm() {
   saveSettings(next); renderCards(); openAdmin(false); queryAll();
 }
 
-function exportAdmin() {
-  const blob = new Blob([JSON.stringify(settings, null, 2)], { type: "application/json" });
-  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "ecos2-admin-settings.json"; link.click(); URL.revokeObjectURL(link.href);
-}
-
-async function importAdmin(file) {
-  try { saveSettings(JSON.parse(await file.text())); renderAdmin(); showToast("관리자 설정을 가져왔습니다."); }
-  catch { showToast("올바른 ECOS2 설정 파일이 아닙니다."); }
-}
-
 function bindEvents() {
   ["dateSingle", "dateStart", "dateEnd"].forEach((id) => attachDateMask(document.getElementById(id)));
   document.querySelectorAll('input[name="dateMode"]').forEach((radio) => radio.addEventListener("change", () => {
-    const single = radio.value === "single" && radio.checked;
-    document.getElementById("singleDateField").hidden = !single;
-    document.getElementById("rangeDateField").hidden = single;
+    if (radio.checked) {
+      syncDateMode(radio.value);
+      saveQuerySettings();
+    }
   }));
   document.getElementById("btnQueryAll").addEventListener("click", queryAll);
   document.getElementById("btnExportAll").addEventListener("click", exportAll);
-  document.getElementById("btnClearDates").addEventListener("click", () => ["dateSingle", "dateStart", "dateEnd"].forEach((id) => { document.getElementById(id).value = ""; }));
+  document.getElementById("btnClearDates").addEventListener("click", () => {
+    ["dateSingle", "dateStart", "dateEnd"].forEach((id) => { document.getElementById(id).value = ""; });
+    saveQuerySettings();
+  });
   document.getElementById("btnAdmin").addEventListener("click", () => openAdmin(document.getElementById("adminPanel").hidden));
   document.getElementById("btnAdminClose").addEventListener("click", () => openAdmin(false));
   document.getElementById("btnAdminSave").addEventListener("click", applyAdminFromForm);
-  document.getElementById("btnAdminExport").addEventListener("click", exportAdmin);
-  document.getElementById("adminImport").addEventListener("change", (event) => event.target.files[0] && importAdmin(event.target.files[0]));
   document.getElementById("btnAdminReset").addEventListener("click", () => { localStorage.removeItem(STORAGE_KEY); settings = normalizeAdminSettings(catalog, {}); renderAdmin(); showToast("기본 설정으로 복원했습니다."); });
   document.addEventListener("contextmenu", (event) => event.preventDefault());
 }
 
 async function init() {
   try {
-    const response = await fetch("./ecos2-catalog.json", { cache: "no-cache" });
-    if (!response.ok) throw new Error("조회항목 목록을 불러오지 못했습니다.");
-    catalog = await response.json();
     settings = normalizeAdminSettings(catalog, loadSettings());
     initDates(); bindEvents(); renderCards(); await queryAll();
   } catch (error) {
@@ -328,4 +406,4 @@ async function init() {
   }
 }
 
-init();
+if (hasDocument) init();

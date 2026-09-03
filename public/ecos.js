@@ -117,6 +117,7 @@ const CATEGORIES = [
 ];
 
 const CHART_COLORS = ["#1a6de0", "#e0631a", "#1a9e6a", "#a31ae0", "#e01a54", "#1ac2e0", "#c9a227"];
+const QUERY_SETTINGS_KEY = "ecos.querySettings.v1";
 
 const grid = document.getElementById("cardGrid");
 const toastEl = document.getElementById("toast");
@@ -137,9 +138,34 @@ function previousBusinessDay(from) {
   return d;
 }
 
-// ---- 기본일자: 단일 조회일 = 오늘의 이전 영업일 / 기간 조회는 기본값 없음 ----
+function loadQuerySettings() {
+  try { return JSON.parse(localStorage.getItem(QUERY_SETTINGS_KEY) || "null"); }
+  catch { return null; }
+}
+
+function saveQuerySettings() {
+  localStorage.setItem(QUERY_SETTINGS_KEY, JSON.stringify({
+    mode: document.querySelector('input[name="dateMode"]:checked').value,
+    single: document.getElementById("dateSingle").value,
+    start: document.getElementById("dateStart").value,
+    end: document.getElementById("dateEnd").value,
+  }));
+}
+
+function syncDateMode(mode) {
+  const isRange = mode === "range";
+  document.querySelector(`input[name="dateMode"][value="${mode}"]`).checked = true;
+  document.getElementById("singleDateField").style.display = isRange ? "none" : "flex";
+  document.getElementById("rangeDateField").style.display = isRange ? "flex" : "none";
+}
+
+// ---- 기본일자: 단일 조회일 = 오늘의 이전 영업일 / 두 ECOS 페이지의 조회조건 공유 ----
 const prevBiz = previousBusinessDay(new Date());
-document.getElementById("dateSingle").value = fmtDate(prevBiz);
+const savedQuerySettings = loadQuerySettings();
+document.getElementById("dateSingle").value = savedQuerySettings?.single ?? fmtDate(prevBiz);
+document.getElementById("dateStart").value = savedQuerySettings?.start ?? "";
+document.getElementById("dateEnd").value = savedQuerySettings?.end ?? "";
+syncDateMode(savedQuerySettings?.mode === "range" ? "range" : "single");
 
 // ---- 날짜 입력 자동 마스킹 (20260804 입력 시 2026-08-04 로 자동 변환) ----
 function attachDateMask(el) {
@@ -149,6 +175,7 @@ function attachDateMask(el) {
     if (digits.length > 4) out = `${digits.slice(0, 4)}-${digits.slice(4)}`;
     if (digits.length > 6) out = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
     el.value = out;
+    saveQuerySettings();
   });
 }
 ["dateSingle", "dateStart", "dateEnd"].forEach((id) => attachDateMask(document.getElementById(id)));
@@ -157,13 +184,13 @@ document.getElementById("btnClearDates").addEventListener("click", () => {
   ["dateSingle", "dateStart", "dateEnd"].forEach((id) => {
     document.getElementById(id).value = "";
   });
+  saveQuerySettings();
 });
 
 document.querySelectorAll('input[name="dateMode"]').forEach((r) => {
   r.addEventListener("change", (e) => {
-    const isRange = e.target.value === "range";
-    document.getElementById("singleDateField").style.display = isRange ? "none" : "flex";
-    document.getElementById("rangeDateField").style.display = isRange ? "flex" : "none";
+    syncDateMode(e.target.value);
+    saveQuerySettings();
   });
 });
 

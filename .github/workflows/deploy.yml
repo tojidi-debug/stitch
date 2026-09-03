@@ -38,7 +38,7 @@ jobs:
             exit 0
           }
           ./scripts/fetch-ecos-data.ps1
-          ./scripts/fetch-ecos-data.ps1 -SeriesFile ./scripts/ecos2-series.json -OutputDir ./public/ecos2-data
+          ./scripts/fetch-ecos-data.ps1 -SeriesFile ./scripts/ecos2-series.json -OutputDir ./public/ecos-data
       - name: Build
         run: npm run build
       - name: Setup Pages

@@ -9,7 +9,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="./ecos.css" />
-<link rel="stylesheet" href="./ecos2.css" />
 </head>
 <body>
 <header>
@@ -43,14 +42,12 @@
 
   <section class="panel admin-panel" id="adminPanel" hidden aria-label="조회항목 관리자 설정">
     <div class="admin-heading">
-      <div><h2>조회항목 관리자 설정</h2><p>표시할 통계를 선택하고 순서와 이름을 바꿀 수 있습니다. 설정은 이 브라우저에만 저장됩니다.</p></div>
+      <div><h2>조회영역 관리자 설정</h2><p>한국은행 ECOS 조회영역을 표시하거나 제외하고, 화면 배치 순서와 이름을 정할 수 있습니다.</p></div>
       <button class="btn btn-clear" id="btnAdminClose" aria-label="관리자 설정 닫기">닫기</button>
     </div>
     <div class="admin-list" id="adminList"></div>
     <div class="admin-actions">
       <button class="btn btn-primary" id="btnAdminSave">설정 적용</button>
-      <button class="btn btn-ghost" id="btnAdminExport">설정 내보내기</button>
-      <label class="btn btn-ghost file-button">설정 가져오기<input type="file" id="adminImport" accept="application/json" /></label>
       <button class="btn btn-clear" id="btnAdminReset">기본값 복원</button>
     </div>
   </section>
