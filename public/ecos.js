@@ -213,6 +213,15 @@ function getQueryRange(cycle) {
   return { start: formatDateForCycle(s, cycle), end: formatDateForCycle(e, cycle), rawStart: s, rawEnd: e, isRange: true };
 }
 
+function selectRowsForQuery(rows, range) {
+  if (range.isRange) {
+    return rows.filter(([time]) => time >= range.start && time <= range.end);
+  }
+  const availableTimes = rows.map(([time]) => String(time)).filter((time) => time <= range.end).sort().reverse();
+  if (!availableTimes.length) return [];
+  return rows.filter(([time]) => String(time) === availableTimes[0]);
+}
+
 function showToast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add("show");
@@ -235,7 +244,7 @@ function renderPivotTable(thead, tbody, items, rows) {
     valuesByDate.get(row.time).set(row.item_name, row.value);
   });
 
-  const dates = [...valuesByDate.keys()].sort();
+  const dates = [...valuesByDate.keys()].sort().reverse();
   if (items.length === 1) {
     const item = items[0];
     thead.innerHTML = `<th class="item-column">항목</th>${dates.map((time) => `<th>${time}</th>`).join("")}`;
@@ -247,7 +256,7 @@ function renderPivotTable(thead, tbody, items, rows) {
       .join("")}</tr>`;
     requestAnimationFrame(() => {
       const tableWrap = tbody.closest(".table-wrap");
-      if (tableWrap) tableWrap.scrollLeft = tableWrap.scrollWidth;
+      if (tableWrap) tableWrap.scrollLeft = 0;
     });
     return;
   }
@@ -346,8 +355,7 @@ async function fetchItem(cat, item, range) {
   }
 
   const data = await res.json();
-  const rows = (data.rows || [])
-    .filter(([time]) => time >= range.start && time <= range.end)
+  const rows = selectRowsForQuery(data.rows || [], range)
     .map(([time, value]) => ({ time, value }));
   return { rows };
 }
@@ -455,7 +463,7 @@ async function queryCategory(cat) {
     }
   }
 
-  allRows.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : a.item_name.localeCompare(b.item_name)));
+  allRows.sort((a, b) => (a.time > b.time ? -1 : a.time < b.time ? 1 : a.item_name.localeCompare(b.item_name)));
 
   cat._lastRows = allRows;
   cat._lastRange = range;
@@ -476,6 +484,7 @@ async function queryCategory(cat) {
     byItem[r.item_name].cnt += 1;
     byItem[r.item_name].series.push({ time: r.time, value: v });
   });
+  Object.values(byItem).forEach((item) => item.series.sort((a, b) => a.time.localeCompare(b.time)));
 
   const avgParts = Object.entries(byItem).map(
     ([name, s]) => `<span class="avg-item">${name} 평균: ${(s.sum / s.cnt).toFixed(2)}</span>`
@@ -507,7 +516,7 @@ function buildRowsForExport(cat) {
     if (!valuesByDate.has(row.time)) valuesByDate.set(row.time, new Map());
     valuesByDate.get(row.time).set(row.item_name, row.value);
   });
-  const dates = [...valuesByDate.keys()].sort();
+  const dates = [...valuesByDate.keys()].sort().reverse();
   if (items.length === 1) {
     const item = items[0];
     return { header: ["항목", ...dates], body: [[item.name, ...dates.map((date) => valuesByDate.get(date).get(item.name) ?? "-")]] };

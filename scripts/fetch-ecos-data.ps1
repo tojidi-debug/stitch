@@ -109,12 +109,18 @@ foreach ($query in $queryPlan) {
         }
       } else {
         $codePath = $encodedCodes -join "/"
-        $url = "https://ecos.bok.or.kr/api/StatisticSearch/$apiKey/json/kr/1/$PageSize/$($query.statCode)/$($query.cycle)/$rangeStart/$rangeEnd/$codePath/"
-        $response = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 60
-        if ($response.RESULT.CODE) { throw "$($response.RESULT.CODE): $($response.RESULT.MESSAGE)" }
-        foreach ($row in @($response.StatisticSearch.row)) {
-          if ($row.TIME) { $rowMap[[string]$row.TIME] = [string]$row.DATA_VALUE }
-        }
+        $pageStart = 1
+        do {
+          $pageEnd = $pageStart + $PageSize - 1
+          $url = "https://ecos.bok.or.kr/api/StatisticSearch/$apiKey/json/kr/$pageStart/$pageEnd/$($query.statCode)/$($query.cycle)/$rangeStart/$rangeEnd/$codePath/"
+          $response = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 60
+          if ($response.RESULT.CODE) { throw "$($response.RESULT.CODE): $($response.RESULT.MESSAGE)" }
+          foreach ($row in @($response.StatisticSearch.row)) {
+            if ($row.TIME) { $rowMap[[string]$row.TIME] = [string]$row.DATA_VALUE }
+          }
+          $totalCount = [int]($response.StatisticSearch.list_total_count)
+          $pageStart += $PageSize
+        } while ($pageStart -le $totalCount)
       }
     }
 

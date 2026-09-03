@@ -131,6 +131,8 @@ main {
   font-size: var(--fs-sm);
 }
 
+.date-fields[hidden] { display: none !important; }
+
 .date-fields input[type="text"] {
   border: 1px solid var(--line);
   border-radius: 4px;

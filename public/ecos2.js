@@ -38,6 +38,19 @@ export function filterRowsByRange(rows, startDate, endDate, cycle) {
   return (rows || []).filter(([time]) => String(time) >= start && String(time) <= end);
 }
 
+export function selectRowsForQuery(rows, startDate, endDate, cycle, isRange) {
+  if (isRange) return filterRowsByRange(rows, startDate, endDate, cycle);
+  const target = cycleBoundary(startDate, cycle);
+  const availableTimes = (rows || [])
+    .map(([time]) => String(time))
+    .filter((time) => time <= target)
+    .sort()
+    .reverse();
+  if (!availableTimes.length) return [];
+  const selectedTime = availableTimes[0];
+  return rows.filter(([time]) => String(time) === selectedTime);
+}
+
 export function normalizeAdminSettings(sourceCatalog, candidate = {}) {
   const ids = sourceCatalog.map((item) => item.id);
   const allowed = new Set(ids);
@@ -70,7 +83,7 @@ export function tableMatrixForCategory(categoryId, series) {
     const { dates, rows } = pivotSeries(series.map((item) => ({ label: item.name, rows: item.rows })), { descending: true });
     return { header: ["항목", ...dates], body: rows };
   }
-  const dates = [...new Set(series.flatMap((item) => item.rows.map(([time]) => time)))].sort();
+  const dates = [...new Set(series.flatMap((item) => item.rows.map(([time]) => time)))].sort().reverse();
   const maps = series.map((item) => new Map(item.rows));
   if (series.length === 1) return { header: ["항목", ...dates], body: [[series[0].name, ...dates.map((date) => maps[0].get(date) ?? "")]] };
   return { header: ["일자", ...series.map((item) => item.name)], body: dates.map((date) => [date, ...maps.map((map) => map.get(date) ?? "")]) };
@@ -160,7 +173,7 @@ function queryRange(cycle) {
   const endRaw = mode === "single" ? single : document.getElementById("dateEnd").value.replace(/\D/g, "");
   if (startRaw.length !== 8 || endRaw.length !== 8) throw new Error("날짜를 YYYYMMDD 형식으로 입력해 주세요.");
   if (startRaw > endRaw) throw new Error("시작일이 종료일보다 늦습니다.");
-  return { start: cycleBoundary(startRaw, cycle), end: cycleBoundary(endRaw, cycle), startRaw, endRaw };
+  return { start: cycleBoundary(startRaw, cycle), end: cycleBoundary(endRaw, cycle), startRaw, endRaw, isRange: mode === "range" };
 }
 
 function buildCard(category) {
@@ -213,7 +226,7 @@ async function fetchItem(category, item, range) {
   const response = await fetch(`${category.dataRoot}/${item.file}`, { cache: "no-cache" });
   if (!response.ok) throw new Error(`${item.name} 데이터(${response.status})`);
   const payload = await response.json();
-  return { ...item, generatedAt: payload.generatedAt, rows: filterRowsByRange(payload.rows || [], range.startRaw, range.endRaw, category.cycle) };
+  return { ...item, generatedAt: payload.generatedAt, rows: selectRowsForQuery(payload.rows || [], range.startRaw, range.endRaw, category.cycle, range.isRange) };
 }
 
 function formatNumber(value) {
@@ -230,7 +243,7 @@ function renderTable(card, category, series) {
   tbody.innerHTML = body.map((row) => `<tr>${row.map((cell, index) => `<td>${index === 0 ? escapeHtml(cell) : formatNumber(cell)}</td>`).join("")}</tr>`).join("");
   requestAnimationFrame(() => {
     const wrap = card.querySelector("[data-role=table]");
-    wrap.scrollLeft = ["stock", "trade"].includes(category.id) ? 0 : wrap.scrollWidth;
+    wrap.scrollLeft = 0;
   });
 }
 

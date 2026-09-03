@@ -5,6 +5,7 @@ import {
   filterRowsByRange,
   normalizeAdminSettings,
   pivotSeries,
+  selectRowsForQuery,
   tableMatrixForCategory,
 } from "../public/ecos2.js";
 
@@ -16,6 +17,15 @@ assert.equal(cycleBoundary("20260804", "A"), "2026");
 assert.deepEqual(
   filterRowsByRange([["2025Q4", "1.2"], ["2026Q1", "0.8"], ["2026Q2", "1.0"]], "20260101", "20260630", "Q"),
   [["2026Q1", "0.8"], ["2026Q2", "1.0"]],
+);
+
+assert.deepEqual(
+  selectRowsForQuery([["20260807", "10"], ["20260810", "11"]], "20260809", "20260809", "D", false),
+  [["20260807", "10"]],
+);
+assert.deepEqual(
+  selectRowsForQuery([["20260810", "11"]], "20260809", "20260809", "D", false),
+  [],
 );
 
 assert.deepEqual(CATALOG.slice(0, 2).map(({ id }) => id), ["stock", "base"]);
@@ -41,6 +51,19 @@ assert.deepEqual(tableMatrixForCategory("stock", transposedSeries), {
   body: [
     ["수출물가", "121.2", "120.1"],
     ["수입물가", "131.4", "130.3"],
+  ],
+});
+
+assert.deepEqual(tableMatrixForCategory("base", [transposedSeries[0]]), {
+  header: ["항목", "202608", "202607"],
+  body: [["수출물가", "121.2", "120.1"]],
+});
+
+assert.deepEqual(tableMatrixForCategory("supply", transposedSeries), {
+  header: ["일자", "수출물가", "수입물가"],
+  body: [
+    ["202608", "121.2", "131.4"],
+    ["202607", "120.1", "130.3"],
   ],
 });
 
