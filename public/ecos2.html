@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="한국은행 ECOS 주가지수, 경제성장률 및 물가지수 조회" />
+<title>ECOS 확장 통계 조회</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./ecos.css" />
+<link rel="stylesheet" href="./ecos2.css" />
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <span class="logo">ECOS</span><span>확장 통계 조회</span>
+    <a class="header-link" href="./ecos.html">기존 통계</a>
+  </div>
+</header>
+
+<main>
+  <section class="panel query-panel" aria-label="조회 기준 설정">
+    <div class="controls-row main-controls-row">
+      <span class="controls-label">🗓️ 조회 기준 설정</span>
+      <div class="mode-toggle">
+        <label><input type="radio" name="dateMode" value="single" /> 단일 조회일</label>
+        <label><input type="radio" name="dateMode" value="range" checked /> 기간 조회</label>
+      </div>
+      <div class="date-fields" id="singleDateField" hidden>
+        <span>조회일</span><input type="text" inputmode="numeric" maxlength="10" id="dateSingle" aria-label="조회일" />
+      </div>
+      <div class="date-fields" id="rangeDateField">
+        <span>시작일</span><input type="text" inputmode="numeric" maxlength="10" id="dateStart" aria-label="시작일" />
+        <span>종료일</span><input type="text" inputmode="numeric" maxlength="10" id="dateEnd" aria-label="종료일" />
+      </div>
+      <button class="btn btn-primary" id="btnQueryAll">전체 조회</button>
+      <button class="btn btn-clear" id="btnClearDates">Clear</button>
+      <button class="btn btn-ghost" id="btnExportAll">전체 엑셀 다운로드</button>
+      <button class="btn btn-admin" id="btnAdmin" aria-expanded="false" aria-controls="adminPanel">⚙ 관리자 설정</button>
+    </div>
+  </section>
+
+  <section class="panel admin-panel" id="adminPanel" hidden aria-label="조회항목 관리자 설정">
+    <div class="admin-heading">
+      <div><h2>조회항목 관리자 설정</h2><p>표시할 통계를 선택하고 순서와 이름을 바꿀 수 있습니다. 설정은 이 브라우저에만 저장됩니다.</p></div>
+      <button class="btn btn-clear" id="btnAdminClose" aria-label="관리자 설정 닫기">닫기</button>
+    </div>
+    <div class="admin-list" id="adminList"></div>
+    <div class="admin-actions">
+      <button class="btn btn-primary" id="btnAdminSave">설정 적용</button>
+      <button class="btn btn-ghost" id="btnAdminExport">설정 내보내기</button>
+      <label class="btn btn-ghost file-button">설정 가져오기<input type="file" id="adminImport" accept="application/json" /></label>
+      <button class="btn btn-clear" id="btnAdminReset">기본값 복원</button>
+    </div>
+  </section>
+
+  <div class="grid" id="cardGrid" aria-live="polite"></div>
+  <p class="footer-note">한국은행 ECOS 공개 통계를 제공합니다. 월·분기 통계는 발표 시차로 최근 자료가 없을 수 있으며, 공개 페이지에는 API 키가 포함되지 않습니다.</p>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="./ecos-xlsx.js"></script>
+<script type="module" src="./ecos2.js"></script>
+</body>
+</html>
